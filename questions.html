@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>qred - Questões</title>
   <link rel="stylesheet" href="style.css">
+    <script>
+    // Redireciona para login se não houver token do Google
+    if (!localStorage.getItem('google_token')) {
+      window.location.href = 'login.html';
+    }
+  </script>
+
 </head>
 <body>
   <header>
