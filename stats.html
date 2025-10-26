@@ -1,32 +1,38 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>qred - Estatísticas</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qred - Estatísticas</title>
+    <link rel="stylesheet" href="style.css">
+    <script>
+      // Redireciona para login se não houver token do Google
+      if (!localStorage.getItem('google_token')) {
+        window.location.href = 'login.html';
+      }
+    </script>
 </head>
 <body>
-  <header>
-    <h1 class="container">qred</h1>
-    <nav>
-      <ul>
-        <li><a href="index.html">Início</a></li>
-        <li><a href="login.html">Entrar</a></li>
-        <li><a href="signup.html">Cadastrar</a></li>
-        <li><a href="upload.html">Enviar PDF</a></li>
-        <li><a href="questions.html">Questões</a></li>
-        <li><a href="simulados.html">Simulados</a></li>
-        <li><a href="stats.html">Estatísticas</a></li>
-      </ul>
-    </nav>
-  </header>
-  <main class="container">
-    <h2>Estatísticas</h2>
-    <p>Nesta seção você poderá acompanhar suas estatísticas de acertos e erros, por área e subtópico, além de visualizar relatórios diários, mensais e por período personalizado. Em breve implementaremos esta funcionalidade.</p>
-  </main>
-  <footer>
-    <p>&copy; 2025 Qred. Todos os direitos reservados.</p>
-  </footer>
+    <header>
+        <h1 class="container">qred</h1>
+        <nav>
+            <ul>
+                <li><a href="index.html">Início</a></li>
+                <li><a href="login.html">Entrar</a></li>
+                <li><a href="signup.html">Cadastrar</a></li>
+                <li><a href="upload.html">Enviar PDF</a></li>
+                <li><a href="questions.html">Questões</a></li>
+                <li><a href="simulados.html">Simulados</a></li>
+                <li><a href="stats.html">Estatísticas</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main class="container">
+        <h2>Estatísticas</h2>
+        <p>Nesta seção você poderá acompanhar suas estatísticas de acertos e erros, por área e subtópico, além de visualizar gráficos por período.</p>
+    </main>
+    <footer>
+        <p>&copy; 2025 Qred. Todos os direitos reservados.</p>
+    </footer>
 </body>
 </html>
