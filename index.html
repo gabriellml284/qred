@@ -4,55 +4,37 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Qred - Plataforma de Estudos</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #fff;
-      color: #333;
-    }
-    header {
-      background-color: #b81c32;
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
-    main {
-      padding: 40px;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    h1 {
-      color: #b81c32;
-    }
-    footer {
-      background-color: #f5f5f5;
-      text-align: center;
-      padding: 20px;
-      margin-top: 50px;
-    }
-    .btn {
-      display: inline-block;
-      padding: 10px 20px;
-      background-color: #b81c32;
-      color: white;
-      border-radius: 4px;
-      text-decoration: none;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>Bem-vindo à Qred</h1>
+  <header class="container">
+    <h1>Qred</h1>
+    <nav>
+      <ul>
+        <li><a href="index.html">Início</a></li>
+        <li><a href="login.html">Entrar</a></li>
+        <li><a href="signup.html">Cadastrar</a></li>
+        <li><a href="upload.html">Enviar PDF</a></li>
+        <li><a href="questions.html">Questões</a></li>
+        <li><a href="simulados.html">Simulados</a></li>
+        <li><a href="stats.html">Estatísticas</a></li>
+      </ul>
+    </nav>
   </header>
-  <main>
-    <h2>Plataforma de questões de medicina</h2>
-    <p>Estamos trabalhando para lançar a sua plataforma de estudos. Em breve você poderá treinar questões e simulados para provas oficiais.</p>
-    <a href="#" class="btn">Saiba mais</a>
+  <main class="container">
+    <h2>Bem-vindo à Qred</h2>
+    <p>A Qred é a sua plataforma de estudos em medicina. Aqui você pode treinar questões, fazer simulados de provas passadas e acompanhar seu desempenho ao longo do tempo.</p>
+    <h3>Funcionalidades principais</h3>
+    <ul>
+      <li><strong>Questões por área e subtópico:</strong> Filtre questões por área (ex.: Psiquiatria, Cardiologia) e subtópico antes de começar.</li>
+      <li><strong>Simulados cronometrados:</strong> Simule provas oficiais passadas com tempo cronometrado e gabarito ao final.</li>
+      <li><strong>Upload de PDFs:</strong> Faça upload de PDFs para alimentar o banco de questões da plataforma.</li>
+      <li><strong>Estatísticas detalhadas:</strong> Acompanhe acertos e erros por área, subtópico e por período (diário, mensal, customizado).</li>
+    </ul>
+    <p>Esta é uma versão inicial. Em breve teremos autenticação completa e a IA processando os PDFs enviados automaticamente.</p>
   </main>
   <footer>
-    <p>&copy; 2025 Qred. Todos os direitos reservados.</p>
+    <p>© 2025 Qred. Todos os direitos reservados.</p>
   </footer>
 </body>
 </html>
