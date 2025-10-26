@@ -29,7 +29,30 @@
     <label for="password">Senha:</label>
     <input type="password" id="password" name="password" required>
     <button type="submit">Entrar</button>
-  </form>
+  <
+      <!-- Login com Google -->
+  <div id="g_id_signin"></div>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    // TODO: Substitua "YOUR_GOOGLE_CLIENT_ID" pelo client ID do Google Cloud
+    function handleCredentialResponse(response) {
+      console.log("Credenciais Google recebidas", response.credential);
+      // Armazenar token e redirecionar
+      localStorage.setItem('google_token', response.credential);
+      window.location.href = "index.html";
+    }
+    window.onload = function () {
+      google.accounts.id.initialize({
+        client_id: "YOUR_GOOGLE_CLIENT_ID",
+        callback: handleCredentialResponse
+      });
+      google.accounts.id.renderButton(
+        document.getElementById("g_id_signin"),
+        { theme: "filled_red", size: "large", text: "continue_with", locale: "pt-BR" }
+      );
+    };
+  </script>
+/form>
   <p>Não tem conta? <a href="signup.html">Cadastre-se</a></p>
 </main>
 <footer>
