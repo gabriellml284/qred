@@ -1,41 +1,183 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>qred - Cadastrar</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro | Qred - Plataforma de Questões</title>
+    
+    <!-- Carrega o Tailwind CSS da CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configuração do Tailwind (para o tema vermelho) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            200: '#fecaca',
+                            300: '#fca5a5',
+                            400: '#f87171',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                            800: '#991b1b',
+                            900: '#7f1d1d',
+                            950: '#450a0a',
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Estilos CSS customizados -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
 </head>
-<body>
-  <header>
-    <h1 class="container">qred</h1>
-    <nav>
-      <ul>
-        <li><a href="index.html">Início</a></li>
-        <li><a href="login.html">Entrar</a></li>
-        <li><a href="signup.html">Cadastrar</a></li>
-        <li><a href="upload.html">Enviar PDF</a></li>
-        <li><a href="questions.html">Questões</a></li>
-        <li><a href="simulados.html">Simulados</a></li>
-        <li><a href="stats.html">Estatísticas</a></li>
-      </ul>
-    </nav>
-  </header>
-  <main class="container">
-    <h2>Criar conta no qred</h2>
-    <form>
-      <label for="name">Nome:</label>
-      <input type="text" id="name" name="name" required>
-      <label for="email">E-mail:</label>
-      <input type="email" id="email" name="email" required>
-      <label for="password">Senha:</label>
-      <input type="password" id="password" name="password" required>
-      <button type="submit">Cadastrar</button>
-    </form>
-    <p>Já possui uma conta? <a href="login.html">Entrar</a></p>
-  </main>
-  <footer>
-    <p>&copy; 2025 Qred. Todos os direitos reservados.</p>
-  </footer>
+<body class="bg-gray-100">
+
+    <!-- Container Principal -->
+    <div class="flex items-center justify-center min-h-screen py-12 px-4">
+        
+        <!-- Cartão de Cadastro -->
+        <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl shadow-xl">
+            
+            <!-- Cabeçalho e Logo -->
+            <div class="flex flex-col items-center">
+                <!-- Ícone -->
+                <svg class="w-12 h-12 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+                
+                <h1 class="text-3xl font-bold text-gray-900 mt-2">Qred</h1>
+                <p class="text-sm text-gray-500">Plataforma de Questões</p>
+                <h2 class="text-xl font-semibold text-gray-800 mt-4">Criar nova conta</h2>
+            </div>
+
+            <!-- Formulário de Cadastro -->
+            <form class="space-y-4" action="#" method="POST">
+                
+                <!-- Campo de Nome Completo -->
+                <div>
+                    <label for="name" class="block text-sm font-medium text-gray-700">
+                        Nome Completo
+                    </label>
+                    <div class="mt-1">
+                        <input id="name" name="name" type="text" autocomplete="name" required
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition duration-150 ease-in-out"
+                               placeholder="Seu nome completo">
+                    </div>
+                </div>
+                
+                <!-- Campo de Email -->
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">
+                        Email
+                    </label>
+                    <div class="mt-1">
+                        <input id="email" name="email" type="email" autocomplete="email" required
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition duration-150 ease-in-out"
+                               placeholder="seuemail@exemplo.com">
+                    </div>
+                </div>
+
+                <!-- Campo de Senha -->
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">
+                        Senha
+                    </label>
+                    <div class="mt-1">
+                        <input id="password" name="password" type="password" autocomplete="new-password" required
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition duration-150 ease-in-out"
+                               placeholder="Crie uma senha forte">
+                    </div>
+                </div>
+                
+                <!-- Campo de Confirmar Senha -->
+                <div>
+                    <label for="password-confirm" class="block text-sm font-medium text-gray-700">
+                        Confirmar Senha
+                    </label>
+                    <div class="mt-1">
+                        <input id="password-confirm" name="password-confirm" type="password" autocomplete="new-password" required
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition duration-150 ease-in-out"
+                               placeholder="Confirme sua senha">
+                    </div>
+                </div>
+
+                <!-- Opções (Termos e Condições) -->
+                <div class="flex items-start pt-2">
+                    <div class="flex items-center h-5">
+                        <input id="terms" name="terms" type="checkbox" required
+                               class="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">
+                    </div>
+                    <div class="ml-3 text-sm">
+                        <label for="terms" class="text-gray-700">
+                            Eu aceito os 
+                            <a href="#" class="font-medium text-primary-600 hover:text-primary-500 hover:underline">Termos de Uso</a> 
+                            e a 
+                            <a href="#" class="font-medium text-primary-600 hover:text-primary-500 hover:underline">Política de Privacidade</a>.
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Botão de Cadastro -->
+                <div class="pt-2">
+                    <button type="submit"
+                            class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition duration-150 ease-in-out">
+                        Criar conta
+                    </button>
+                </div>
+            </form>
+
+            <!-- Linha Separadora -->
+            <div class="relative pt-4">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-gray-300"></div>
+                </div>
+                <div class="relative flex justify-center text-sm">
+                    <span class="px-2 bg-white text-gray-500">
+                        ou
+                    </span>
+                </div>
+            </div>
+
+            <!-- Botão de Login com Google -->
+            <div class="pt-4">
+                <button type="button"
+                        class="w-full flex items-center justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition duration-150 ease-in-out">
+                    <!-- Ícone do Google (SVG) -->
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px">
+                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.223,0-9.649-3.657-11.303-8H6.306C9.656,39.663,16.318,44,24,44z"/>
+                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571l6.19,5.238C39.901,36.639,44,30.701,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+                    </svg>
+                    Continuar com o Google
+                </button>
+            </div>
+
+            <!-- Link de Login -->
+            <div class="text-center pt-4">
+                <p class="text-sm text-gray-600">
+                    Já tem uma conta?
+                    <a href="login.html" class="font-medium text-primary-600 hover:text-primary-500 hover:underline">
+                        Faça login
+                    </a>
+                </p>
+            </div>
+
+        </div>
+    </div>
+
 </body>
 </html>
