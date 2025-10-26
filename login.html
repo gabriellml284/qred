@@ -123,12 +123,19 @@
             <div class="text-center">
                 <p class="text-sm text-gray-600">
                     Não tem uma conta?
-                    <a href="#" class="font-medium text-primary-600 hover:text-primary-500 hover:underline">
-                        Cadastre-se gratuitamente
-                    </a>
-                </p>
-            </div>
-        </div>
+               <<a href="signup.html" class="font-medium text-primary-600 hover:text-primary-500 hover:underline">Cadastre-se gratuitamente</a>
+            </p>
+    </div>
+      <script>
+        document.querySelector('form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            // Armazena um token simples indicando que o usuário está logado
+            localStorage.setItem('google_token', 'user_logged_in');
+            // Redireciona para o dashboard
+            window.location.href = 'index.html';
+        });
+    </script>
+    </div
     </div>
 
 </body>
