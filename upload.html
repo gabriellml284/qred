@@ -1,43 +1,781 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>qred - Enviar PDF</title>
-  <link rel="stylesheet" href="style.css">
-      <script>
-        // Redireciona para login se não houver token do Google
-        if (!localStorage.getItem('google_token')) {
-            window.location.href = 'login.html';
+import React, { useState, useEffect } from 'react';
+import { BookOpen, CheckCircle, RefreshCcw, HelpCircle, Save, Cloud, CloudOff, ExternalLink } from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
+
+const isFirebaseAvailable = typeof __firebase_config !== 'undefined';
+let app, auth, db, appId;
+
+if (isFirebaseAvailable) {
+  const firebaseConfig = JSON.parse(__firebase_config);
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+}
+
+// Função para simplificar a criação de tarefas baseada no texto
+const createWeek = (weekNum, title, taskStrings) => ({
+  week: weekNum,
+  title: title,
+  tasks: taskStrings.map((t, i) => {
+    const lowerT = t.toLowerCase();
+    let type = 'teoria';
+    if (lowerT.includes('questões') || lowerT.includes('simulado') || lowerT.includes('erradas')) {
+      type = 'questoes';
+    } else if (lowerT.includes('revisão')) {
+      type = 'revisao';
+    }
+    return { 
+      id: `w${weekNum}-t${i+1}`, 
+      type, 
+      title: t,
+      link: type === 'questoes' ? 'https://med.estrategia.com/banco-de-questoes' : null
+    };
+  })
+});
+
+const scheduleData = [
+  createWeek(1, "Início do Intensivo: Bases Iniciais", [
+    "[Preventiva] Saúde Coletiva - Processo Saúde-Doença e Determinantes (Teoria)",
+    "[Pediatria] Neonatologia - Avaliação e Cuidados Neonatais Iniciais (Teoria)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Avaliação Inicial e Vias Aéreas (Teoria)",
+    "[Ginecologia] Mastologia - Alterações Benignas da Mama (Teoria)",
+    "[Obstetrícia] Complicações da Gestação - Sangramento da Primeira Metade (Teoria)",
+    "[Preventiva] Saúde Coletiva - Processo Saúde-Doença II (Teoria)",
+    "[Pediatria] Neonatologia - Cuidados Neonatais e Triagem II (Teoria)",
+    "[Infectologia] Doenças Micobacterianas - Tuberculose Pulmonar e Extrapulmonar (Teoria)",
+    "[Gastroenterologia] Doenças do Esôfago - DRGE, Esofagites e Corpo Estranho (Teoria)",
+    "[Nefrologia] Síndromes Renais - Doença Renal Crônica e Complicações (Teoria)"
+  ]),
+  createWeek(2, "Avanço nas Bases e Trauma Torácico", [
+    "[Preventiva] Saúde Coletiva - Processo Saúde-Doença (Revisão)",
+    "[Pediatria] Neonatologia - Cuidados Neonatais (Revisão)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Trauma Torácico (Teoria)",
+    "[Ginecologia] Mastologia - Alterações Benignas da Mama (Revisão)",
+    "[Obstetrícia] Complicações da Gestação - Sangramento da Primeira Metade II (Teoria)",
+    "[Infectologia] Doenças Micobacterianas - Tuberculose (Revisão)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Trauma Inicial e Torácico (Revisão)",
+    "[Endocrinologia] Distúrbios Glicêmicos - Diabetes Mellitus Tipo 2 (Teoria)",
+    "[Neurologia] Urgências Neurológicas - Traumatismo Cranioencefálico (Teoria)",
+    "[Pneumologia] Distúrbios Obstrutivos - Asma Brônquica (Teoria)"
+  ]),
+  createWeek(3, "Saúde Coletiva, Choque e Climatério", [
+    "[Preventiva] Epidemiologia - Medidas de Saúde Coletiva 1 (Teoria)",
+    "[Pediatria] Cardiologia Pediátrica - Cardiopatias Congênitas (Teoria)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Choque Hipovolêmico (Teoria)",
+    "[Ginecologia] Endocrinologia Ginecológica - Climatério e Terapia Hormonal (Teoria)",
+    "[Obstetrícia] Complicações da Gestação - Sangramento da Primeira Metade III (Teoria)",
+    "[Preventiva] Epidemiologia - Medidas de Saúde Coletiva 1 (Revisão)",
+    "[Pediatria] Cardiologia Pediátrica - Cardiopatias Congênitas II (Teoria)",
+    "[Infectologia] Doenças Sexualmente Transmissíveis - HIV/AIDS (Teoria)",
+    "[Gastroenterologia] Doenças do Esôfago - DRGE e Esofagites (Revisão)",
+    "[Nefrologia] Síndromes Renais - DRC (Revisão)",
+    "[Cardiologia] Insuficiência Cardíaca - Diagnóstico e Tratamento 1 e 2 (Teoria)"
+  ]),
+  createWeek(4, "Hemostasia e Avanço em Cirurgia", [
+    "[Preventiva] Epidemiologia - Medidas de Saúde Coletiva 2 (Teoria)",
+    "[Pediatria] Cardiologia Pediátrica - Cardiopatias Congênitas (Revisão)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Choque II (Teoria)",
+    "[Ginecologia] Endocrinologia Ginecológica - Climatério (Revisão)",
+    "[Obstetrícia] Complicações da Gestação - Sangramento 1ª Metade (Revisão)",
+    "[Infectologia] Doenças Sexualmente Transmissíveis - HIV/AIDS (Revisão)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Choque (Revisão)",
+    "[Endocrinologia] Distúrbios Glicêmicos - DM2 (Revisão)",
+    "[Neurologia] Urgências Neurológicas - TCE II (Teoria)",
+    "[Pneumologia] Distúrbios Obstrutivos - Asma II (Teoria)",
+    "[Hematologia] Distúrbios da Coagulação - Hemostasia 1 e 2 (Teoria)",
+    "[Infectologia] Bateria de Questões: Tuberculose e HIV (Revisão por Questões)"
+  ]),
+  createWeek(5, "Emergências, Trauma Abdominal e LRA", [
+    "[Preventiva] Epidemiologia - Medidas de SC 2 (Revisão)",
+    "[Pediatria] Emergências Pediátricas - Suporte de Vida 1 (Teoria)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Trauma Abdominal e Pélvico (Teoria)",
+    "[Ginecologia] Oncologia Ginecológica - Rastreamento Câncer de Colo (Teoria)",
+    "[Obstetrícia] Infecções Congênitas - Sífilis na Gestação (Teoria)",
+    "[Preventiva] Epidemiologia - Medidas de SC 3 (Teoria)",
+    "[Pediatria] Emergências Pediátricas - Suporte de Vida II (Teoria)",
+    "[Gastroenterologia] Doenças Pancreáticas - Pancreatite Aguda e Crônica (Teoria)",
+    "[Nefrologia] Síndromes Renais - Lesão Renal Aguda (Teoria)",
+    "[Psiquiatria] Transtornos Mentais - Dependência e Intoxicações (Teoria)",
+    "[Reumatologia] Doenças Sistêmicas - Doenças Inflamatórias do Tecido Conjuntivo I (Teoria)"
+  ]),
+  createWeek(6, "Complicações Agudas e Arboviroses", [
+    "[Preventiva] Epidemiologia - Medidas de SC 3 (Revisão)",
+    "[Pediatria] Emergências Pediátricas - Suporte de Vida III (Teoria)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Trauma Abdominal e Pélvico II (Teoria)",
+    "[Ginecologia] Oncologia Ginecológica - Rastreamento Câncer de Colo (Revisão)",
+    "[Obstetrícia] Infecções Congênitas - Sífilis na Gestação II (Teoria)",
+    "[Infectologia] Doenças Infecciosas - Arboviroses (Dengue, Zika, Chikungunya) (Teoria)",
+    "[Endocrinologia] Distúrbios Glicêmicos - DM Complicações Agudas (Teoria)",
+    "[Cardiologia] Insuficiência Cardíaca - Diagnóstico e Tratamento (Revisão)",
+    "[Hepatologia] Doenças Hepáticas - Introdução e Síndrome Ictérica (Teoria)",
+    "[Dermatologia] Doenças Infecciosas - Hanseníase e S. Verrucosas (Teoria)",
+    "[Otorrinolaringologia] Oncologia - Neoplasias de Cabeça e Pescoço (Teoria)",
+    "[Preventiva] Bateria de Questões: Saúde Coletiva e Medidas (Revisão por Questões)"
+  ]),
+  createWeek(7, "Vigilância, Úlceras e Demências", [
+    "[Preventiva] Epidemiologia - Vigilância em Saúde (Teoria)",
+    "[Pediatria] Emergências Pediátricas - Suporte de Vida (Revisão)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Trauma Abdominal (Revisão)",
+    "[Ginecologia] Infecções - Úlceras Genitais (Teoria)",
+    "[Obstetrícia] Infecções Congênitas - Sífilis na Gestação (Revisão)",
+    "[Pediatria] Neonatologia - Icterícia e Sepse Neonatal (Teoria)",
+    "[Cirurgia] Cirurgia Pediátrica - Afecções Cirúrgicas da Infância 1 (Teoria)",
+    "[Gastroenterologia] Doenças Pancreáticas - Pancreatite (Revisão)",
+    "[Neurologia] Transtornos Cognitivos - Demências (Teoria)",
+    "[Pneumologia] Distúrbios Obstrutivos - Asma (Revisão)",
+    "[Ortopedia] Ortopedia Pediátrica e Politrauma (Teoria)",
+    "[Cirurgia] Bateria de Questões: Atendimento ao Politraumatizado (Revisão por Questões)",
+    "[Gastroenterologia] Bateria de Questões: DRGE e Pancreatite (Revisão por Questões)"
+  ]),
+  createWeek(8, "Síndromes Hipertensivas e SIS", [
+    "[Preventiva] Epidemiologia - Vigilância em Saúde (Revisão)",
+    "[Pediatria] Neonatologia - Icterícia e Sepse Neonatal II (Teoria)",
+    "[Cirurgia] Cirurgia Pediátrica - Afecções Cirúrgicas 1 (Revisão)",
+    "[Ginecologia] Infecções - Úlceras Genitais (Revisão)",
+    "[Obstetrícia] Complicações da Gestação - Síndromes Hipertensivas da Gestação 1 (Teoria)",
+    "[Preventiva] Gestão em Saúde - Sistemas de Informação em Saúde 1 (Teoria)",
+    "[Infectologia] Doenças Infecciosas - Arboviroses (Revisão)",
+    "[Endocrinologia] Distúrbios Glicêmicos - DM Complicações Agudas (Revisão)",
+    "[Nefrologia] Síndromes Renais - LRA (Revisão)",
+    "[Hematologia] Distúrbios da Coagulação - Hemostasia (Revisão)",
+    "[Reumatologia] Doenças Sistêmicas - Doenças Inflamatórias do Tecido Conjuntivo II (Teoria)",
+    "[Ginecologia] Bateria de Questões: Mama, Climatério e Úlceras (Revisão por Questões)",
+    "[Nefrologia] Bateria de Questões: Síndromes Renais DRC e LRA (Revisão por Questões)"
+  ]),
+  createWeek(9, "Meningites e Planejamento Familiar", [
+    "[Preventiva] Gestão em Saúde - Sistemas de Informação 2 (Teoria)",
+    "[Pediatria] Neonatologia - Icterícia e Sepse (Revisão)",
+    "[Cirurgia] Cirurgia Pediátrica - Afecções Cirúrgicas 2 (Teoria)",
+    "[Ginecologia] Anticoncepção e Planejamento Familiar (Teoria)",
+    "[Obstetrícia] Complicações da Gestação - Síndromes Hipertensivas II (Teoria)",
+    "[Pediatria] Doenças Infecciosas - Doenças Exantemáticas da Infância 1 (Teoria)",
+    "[Cirurgia] Cirurgia Pediátrica - Afecções Cirúrgicas 2 (Revisão)",
+    "[Infectologia] Infecções do SNC - Meningites Virais e Bacterianas (Teoria)",
+    "[Gastroenterologia] Oncologia TGI - Polipose e Câncer Colorretal (Teoria)",
+    "[Neurologia] Transtornos Neurológicos - TCE e Demências (Revisão)",
+    "[Cardiologia] Doença Cardiovascular - Hipertensão Arterial Sistêmica 1 (Teoria)",
+    "[Psiquiatria] Transtornos Mentais - Dependência e Intoxicações (Revisão)",
+    "[Pediatria] Bateria de Questões: Neonatologia, Cardio e Emergências (Revisão por Questões)"
+  ]),
+  createWeek(10, "Pneumo Intensiva e Hepatites", [
+    "[Preventiva] Gestão em Saúde - Sistemas de Informação 3 (Teoria)",
+    "[Pediatria] Doenças Infecciosas - Doenças Exantemáticas II (Teoria)",
+    "[Cirurgia] Cirurgia Pediátrica - Afecções Cirúrgicas 3 (Teoria)",
+    "[Ginecologia] Anticoncepção e Planejamento Familiar (Revisão)",
+    "[Obstetrícia] Complicações da Gestação - Síndromes Hipertensivas III (Teoria)",
+    "[Preventiva] Gestão em Saúde - Sistemas de Informação (Revisão)",
+    "[Infectologia] Infecções do SNC - Meningites (Revisão)",
+    "[Endocrinologia] Distúrbios Glicêmicos - DM Complicações Crônicas (Teoria)",
+    "[Nefrologia] Distúrbios Eletrolíticos - Distúrbios Ácido-Base (Teoria)",
+    "[Pneumologia] Terapia Intensiva - Pneumologia Intensiva e Ventilação 1 (Teoria)",
+    "[Hepatologia] Doenças Hepáticas - Hepatites Virais Agudas e Crônicas (Teoria)"
+  ]),
+  createWeek(11, "Medicina de Família e Imunizações", [
+    "[Preventiva] Atenção Básica - Medicina de Família e Comunidade 1 (Teoria)",
+    "[Pediatria] Doenças Infecciosas - Doenças Exantemáticas (Revisão)",
+    "[Cirurgia] Cirurgia Pediátrica - Afecções Cirúrgicas 3 (Revisão)",
+    "[Ginecologia] Infecções Genitais - Vulvovaginites e Cervicites (Teoria)",
+    "[Obstetrícia] Complicações da Gestação - Síndromes Hipertensivas (Revisão)",
+    "[Pediatria] Puericultura - Calendário Vacinal e Imunizações 1 (Teoria)",
+    "[Infectologia] Síndromes Clínicas - Sepse e Choque Séptico (Teoria)",
+    "[Gastroenterologia] Oncologia TGI - Pólipos e Neoplasias Intestinais (Revisão)",
+    "[Hematologia] Série Vermelha - Anemias Hemolíticas (Teoria)",
+    "[Reumatologia] Doenças Sistêmicas - Lúpus Eritematoso Sistêmico e SAAF (Teoria)",
+    "[Oftalmologia] Afecções Oculares - Síndrome do Olho Vermelho (Teoria)",
+    "[Cirurgia] Bateria de Questões: Cirurgia Pediátrica (Revisão por Questões)",
+    "[Obstetrícia] Bateria de Questões: Sangramento, Sífilis e DHEG (Revisão por Questões)"
+  ]),
+  createWeek(12, "Apendicite e Pré-Natal", [
+    "[Preventiva] Atenção Básica - Medicina de Família e Comunidade 2 (Teoria)",
+    "[Pediatria] Puericultura - Calendário Vacinal e Imunizações 2 (Teoria)",
+    "[Cirurgia] Abdome Agudo Inflamatório - Apendicite Aguda (Teoria)",
+    "[Ginecologia] Infecções Genitais - Vulvovaginites (Revisão)",
+    "[Obstetrícia] Assistência Pré-Natal - Rotinas e Exames 1 (Teoria)",
+    "[Preventiva] Atenção Básica - Medicina de Família (Revisão)",
+    "[Cirurgia] Abdome Agudo Inflamatório - Apendicite Aguda (Revisão)",
+    "[Endocrinologia] Distúrbios Glicêmicos - DM Complicações Crônicas (Revisão)",
+    "[Nefrologia] Distúrbios Eletrolíticos - Distúrbios do Potássio (Teoria)",
+    "[Neurologia] Transtornos Neurológicos - Cefaleias e Epilepsias (Teoria)",
+    "[Cardiologia] Doença Cardiovascular - HAS 2 (Teoria)",
+    "[Preventiva] Bateria de Questões: Vigilância, SIS e MFC (Revisão por Questões)",
+    "[Endocrinologia] Bateria de Questões: DM2 e Complicações (Revisão por Questões)"
+  ]),
+  createWeek(13, "Princípios do SUS e Vias Biliares", [
+    "[Preventiva] Sistema de Saúde - Princípios e Diretrizes do SUS 1 (Teoria)",
+    "[Pediatria] Puericultura - Calendário Vacinal e Imunizações 3 (Teoria)",
+    "[Cirurgia] Abdome Agudo Inflamatório - Colecistite e Colangite Aguda (Teoria)",
+    "[Ginecologia] Ginecologia Benigna - Endometriose (Teoria)",
+    "[Obstetrícia] Assistência Pré-Natal - Rotinas e Exames 2 (Teoria)",
+    "[Pediatria] Puericultura - Imunizações (Revisão)",
+    "[Infectologia] Síndromes Clínicas - Sepse (Revisão)",
+    "[Gastroenterologia] Doenças Intestinais - Doença Inflamatória Intestinal (Teoria)",
+    "[Pneumologia] Terapia Intensiva - Pneumologia Intensiva 2 (Teoria)",
+    "[Psiquiatria] Transtornos Mentais - Transtornos do Humor e Reforma Psiquiátrica (Teoria)",
+    "[Hepatologia] Doenças Hepáticas - Hepatites e Icterícia (Revisão)",
+    "[Infectologia] Bateria de Questões: Arboviroses, Meningites e Sepse (Revisão por Questões)"
+  ]),
+  createWeek(14, "Tireotoxicose e Ortopedia", [
+    "[Preventiva] Sistema de Saúde - Princípios e Diretrizes do SUS 2 (Teoria)",
+    "[Pediatria] Pneumologia Pediátrica - Asma na Infância (Teoria)",
+    "[Cirurgia] Abdome Agudo Inflamatório - Colecistite e Colangite Aguda (Revisão)",
+    "[Ginecologia] Ginecologia Benigna - Endometriose (Revisão)",
+    "[Obstetrícia] Assistência Pré-Natal - Rotinas e Exames (Revisão)",
+    "[Endocrinologia] Doenças da Tireoide - Hipertireoidismo e Tireotoxicose (Teoria)",
+    "[Cirurgia] Abdome Agudo Inflamatório - Diverticulite Aguda (Teoria)",
+    "[Neurologia] Transtornos Neurológicos - Cefaleias e Epilepsias (Revisão)",
+    "[Dermatologia] Doenças Infecciosas - Hanseníase e Verrucosas (Revisão)",
+    "[Ortopedia] Patologias Ortopédicas - Coluna e Maus Tratos (Teoria)",
+    "[Otorrinolaringologia] Infecções - IVAS 1 (Teoria)"
+  ]),
+  createWeek(15, "Atenção Primária e Assist. Parto", [
+    "[Preventiva] Sistema de Saúde - Princípios e Diretrizes do SUS (Revisão)",
+    "[Pediatria] Pneumologia Pediátrica - Asma na Infância (Revisão)",
+    "[Cirurgia] Abdome Agudo Inflamatório - Diverticulite Aguda (Revisão)",
+    "[Ginecologia] Mastologia - Câncer de Mama (Teoria)",
+    "[Obstetrícia] Fisiologia Obstétrica - Assistência ao Parto (Teoria)",
+    "[Preventiva] Atenção Básica - APS no Brasil 1 (Teoria)",
+    "[Pediatria] Puericultura - Aleitamento Materno (Teoria)",
+    "[Infectologia] Doenças Infecciosas - Parasitoses e Infecção Hospitalar (Teoria)",
+    "[Gastroenterologia] Doenças Intestinais - Doença Inflamatória Intestinal (Revisão)",
+    "[Nefrologia] Distúrbios Eletrolíticos - Ácido-Base e Potássio (Revisão)",
+    "[Cardiologia] Doença Cardiovascular - HAS 3 (Teoria)",
+    "[Cirurgia] Bateria de Questões: Apendicite, Colecistite, Diverticulite (Revisão por Questões)"
+  ]),
+  createWeek(16, "Cirurgia Vascular e Distúrbios do Mov.", [
+    "[Preventiva] Atenção Básica - APS no Brasil 2 (Teoria)",
+    "[Pediatria] Puericultura - Aleitamento Materno (Revisão)",
+    "[Cirurgia] Cirurgia Vascular - Doença Arterial Obstrutiva e Aneurismas (Teoria)",
+    "[Ginecologia] Mastologia - Câncer de Mama (Revisão)",
+    "[Obstetrícia] Fisiologia Obstétrica - Assistência ao Parto (Revisão)",
+    "[Infectologia] Doenças Infecciosas - Parasitoses e Infecção Hospitalar (Revisão)",
+    "[Endocrinologia] Doenças da Tireoide - Hipertireoidismo e Tireotoxicose (Revisão)",
+    "[Neurologia] Transtornos do Movimento - Parkinson e Coreias 1 (Teoria)",
+    "[Pneumologia] Terapia Intensiva - Pneumologia Intensiva 3 (Teoria)",
+    "[Hematologia] Série Vermelha - Anemias Hemolíticas (Revisão)",
+    "[Pediatria] Bateria de Questões: Exantemas, Imunização e Aleitamento (Revisão por Questões)",
+    "[Ginecologia] Bateria de Questões: Vulvovaginites, Endometriose e Mama (Revisão por Questões)"
+  ]),
+  createWeek(17, "Urologia e Neoplasias do TGI", [
+    "[Preventiva] Atenção Básica - APS no Brasil 3 (Teoria)",
+    "[Pediatria] Gastroenterologia Pediátrica - Diarreia Aguda e Desidratação (Teoria)",
+    "[Cirurgia] Cirurgia Vascular - DAOP e Aneurismas (Revisão)",
+    "[Ginecologia] Ginecologia Endócrina - Sangramento Uterino Anormal (Teoria)",
+    "[Obstetrícia] Medicina Fetal - Avaliação da Vitalidade Fetal (Teoria)",
+    "[Preventiva] Atenção Básica - APS no Brasil (Revisão)",
+    "[Pediatria] Gastroenterologia Pediátrica - Diarreia e Desidratação (Revisão)",
+    "[Cirurgia] Urologia - HPB, Câncer de Próstata e Bexiga 1 (Teoria)",
+    "[Infectologia] Infecções Respiratórias - Pneumonias Bacterianas 1 (Teoria)",
+    "[Gastroenterologia] Oncologia TGI - Neoplasias de Estômago e Esôfago (Teoria)",
+    "[Nefrologia] Urologia/Nefrologia - Litíase Renal e Trato Urinário (Teoria)"
+  ]),
+  createWeek(18, "Ética Médica e Hipotireoidismo", [
+    "[Preventiva] Bioética - Código de Ética Médica (Teoria)",
+    "[Pediatria] Pneumologia Pediátrica - Pneumonias na Infância (Teoria)",
+    "[Cirurgia] Urologia - Afecções Urológicas 2 (Teoria)",
+    "[Ginecologia] Ginecologia Endócrina - Sangramento Uterino Anormal (Revisão)",
+    "[Obstetrícia] Medicina Fetal - Vitalidade Fetal (Revisão)",
+    "[Infectologia] Infecções Respiratórias - Pneumonias Bacterianas 2 (Teoria)",
+    "[Endocrinologia] Doenças da Tireoide - Hipotireoidismo (Teoria)",
+    "[Neurologia] Transtornos do Movimento - Parkinson e Coreias 2 (Teoria)",
+    "[Cardiologia] Doença Cardiovascular - HAS (Revisão Geral)",
+    "[Psiquiatria] Transtornos Mentais - Humor e Reforma Psiquiátrica (Revisão)",
+    "[Reumatologia] Doenças Sistêmicas - Doenças do Tecido Conjuntivo (Revisão)",
+    "[Obstetrícia] Bateria de Questões: Pré-Natal, Parto e Vitalidade (Revisão por Questões)",
+    "[Cardiologia] Bateria de Questões: Insuficiência Cardíaca e HAS (Revisão por Questões)"
+  ]),
+  createWeek(19, "Diabetes Gestacional e Cirrose", [
+    "[Pediatria] Pneumologia Pediátrica - Pneumonias na Infância (Revisão)",
+    "[Cirurgia] Urologia - Afecções Urológicas 3 (Teoria)",
+    "[Ginecologia] Oncologia Ginecológica - Tumores Anexiais e Câncer de Ovário (Teoria)",
+    "[Obstetrícia] Complicações da Gestação - Diabetes na Gestação 1 (Teoria)",
+    "[Preventiva] Bioética - Ética Médica (Revisão)",
+    "[Pediatria] Emergências Pediátricas - Choque e Manejo em Pediatria (Teoria)",
+    "[Cirurgia] Urologia - Afecções Urológicas (Revisão)",
+    "[Gastroenterologia] Oncologia TGI - Neoplasias de Estômago/Esôfago (Revisão)",
+    "[Nefrologia] Urologia/Nefrologia - Litíase Renal (Revisão)",
+    "[Hepatologia] Doenças Hepáticas - Complicações da Cirrose Hepática 1 (Teoria)",
+    "[Preventiva] Bateria de Questões: SUS, APS e Ética (Revisão por Questões)",
+    "[Gastroenterologia] Bateria de Questões: Pólipos, DII e Neoplasias (Revisão por Questões)",
+    "[Nefrologia] Bateria de Questões: Ácido-Base, Potássio e Litíase (Revisão por Questões)"
+  ]),
+  createWeek(20, "Financiamento e Leucemias", [
+    "[Preventiva] Gestão em Saúde - Financiamento do SUS 1 (Teoria)",
+    "[Pediatria] Emergências Pediátricas - Choque em Pediatria (Revisão)",
+    "[Cirurgia] Cirurgia de Parede Abdominal - Hérnias Inguinais e Ventrais 1 (Teoria)",
+    "[Ginecologia] Oncologia Ginecológica - Tumores Anexiais e CA Ovário (Revisão)",
+    "[Obstetrícia] Complicações da Gestação - Diabetes na Gestação 2 (Teoria)",
+    "[Infectologia] Infecções Respiratórias - Pneumonias Bacterianas 3 (Teoria)",
+    "[Endocrinologia] Doenças da Tireoide - Hipotireoidismo (Revisão)",
+    "[Pneumologia] Terapia Intensiva - Pneumologia Intensiva (Revisão)",
+    "[Hematologia] Série Vermelha e Branca - Anemias Microcíticas e Leucemias (Teoria)",
+    "[Otorrinolaringologia] Infecções - IVAS 2 (Teoria)",
+    "[Oftalmologia] Afecções Oculares - Doenças do Polo Posterior (Teoria)"
+  ]),
+  createWeek(21, "Valvopatias e Vasculites", [
+    "[Preventiva] Gestão em Saúde - Financiamento do SUS 2 (Teoria)",
+    "[Pediatria] Gastroenterologia Pediátrica - Alergia Alimentar e APLV (Teoria)",
+    "[Cirurgia] Cirurgia de Parede Abdominal - Hérnias 2 (Teoria)",
+    "[Ginecologia] Uroginecologia - Prolapsos de Órgãos Pélvicos (Teoria)",
+    "[Obstetrícia] Complicações da Gestação - Diabetes na Gestação (Revisão)",
+    "[Pediatria] Gastroenterologia Pediátrica - Alergia Alimentar (Revisão)",
+    "[Gastroenterologia] Doenças Intestinais - Anatomia do Intestino e SII (Teoria)",
+    "[Neurologia] Transtornos do Movimento - Distúrbios do Movimento (Revisão)",
+    "[Cardiologia] Doença Cardiovascular - Valvopatias e Sopros (Teoria)",
+    "[Reumatologia] Doenças Sistêmicas - Vasculites Primárias e Secundárias (Teoria)",
+    "[Ortopedia] Traumatologia Ortopédica - Fraturas e Complicações (Teoria)",
+    "[Pediatria] Bateria de Questões: Diarreia, Pneumonia, Choque e Alergia (Revisão por Questões)"
+  ]),
+  createWeek(22, "Reanimação Neo e Obesidade", [
+    "[Preventiva] Gestão em Saúde - Financiamento do SUS (Revisão)",
+    "[Pediatria] Neonatologia - Reanimação Neonatal em Sala de Parto (Teoria)",
+    "[Cirurgia] Cirurgia de Parede Abdominal - Hérnias 3 (Teoria)",
+    "[Ginecologia] Uroginecologia - Prolapsos Pélvicos (Revisão)",
+    "[Obstetrícia] Complicações da Gestação - Sangramento da 2ª Metade (Teoria)",
+    "[Preventiva] Bioestatística - Epidemiologia e Estatística Médica 1 (Teoria)",
+    "[Cirurgia] Cirurgia de Parede Abdominal - Hérnias (Revisão)",
+    "[Infectologia] Infecções Respiratórias - Pneumonias Bacterianas (Revisão)",
+    "[Endocrinologia] Nutrologia - Obesidade e Cirurgia Bariátrica (Teoria)",
+    "[Nefrologia] Distúrbios Eletrolíticos - Disnatremias e Sódio 1 (Teoria)",
+    "[Psiquiatria] Transtornos Mentais - Psicofarmacologia e Psiquiatria Infantil (Teoria)",
+    "[Infectologia] Bateria de Questões: Parasitoses, Infecção Hospitalar e Pneumonias (Revisão por Questões)"
+  ]),
+  createWeek(23, "Anestesiologia e Animais Peçonhentos", [
+    "[Preventiva] Bioestatística - Estatística Médica 2 (Teoria)",
+    "[Pediatria] Neonatologia - Reanimação Neonatal (Revisão)",
+    "[Cirurgia] Princípios Cirúrgicos - Anestesiologia e Fármacos 1 (Teoria)",
+    "[Ginecologia] Oncologia Ginecológica - Câncer de Colo Uterino (Teoria)",
+    "[Obstetrícia] Complicações da Gestação - Sangramento da 2ª Metade (Revisão)",
+    "[Pediatria] Puericultura - Avaliação do Crescimento (Teoria)",
+    "[Infectologia] Acidentes e Intoxicações - Animais Peçonhentos (Teoria)",
+    "[Gastroenterologia] Doenças Intestinais - Anatomia do Intestino e SII (Revisão)",
+    "[Neurologia] Urgências Neurológicas - Acidente Vascular Cerebral (AVC) (Teoria)",
+    "[Pneumologia] Distúrbios Obstrutivos - Doença Pulmonar Obstrutiva Crônica (DPOC) (Teoria)",
+    "[Hepatologia] Doenças Hepáticas - Complicações da Cirrose Hepática 2 (Teoria)"
+  ]),
+  createWeek(24, "Partograma e Distocia", [
+    "[Preventiva] Bioestatística - Estatística Médica (Revisão 1)",
+    "[Pediatria] Puericultura - Avaliação do Crescimento (Revisão)",
+    "[Cirurgia] Princípios Cirúrgicos - Anestesiologia e Fármacos 2 (Teoria)",
+    "[Ginecologia] Oncologia Ginecológica - Câncer de Colo Uterino (Revisão)",
+    "[Obstetrícia] Fisiologia Obstétrica - Partograma e Distocias do Parto (Teoria)",
+    "[Preventiva] Bioestatística - Estatística Médica 3 (Teoria)",
+    "[Cirurgia] Princípios Cirúrgicos - Anestesiologia (Revisão)",
+    "[Infectologia] Acidentes e Intoxicações - Animais Peçonhentos (Revisão)",
+    "[Endocrinologia] Nutrologia - Obesidade e Cirurgia Bariátrica (Revisão)",
+    "[Nefrologia] Distúrbios Eletrolíticos - Disnatremias e Sódio 2 (Teoria)",
+    "[Cardiologia] Doença Cardiovascular - Valvopatias (Revisão)",
+    "[Cirurgia] Bateria de Questões: Vascular, Urologia, Hérnias e Anestesio (Revisão por Questões)",
+    "[Ginecologia] Bateria de Questões: SUA, Anexiais, Prolapsos e CA Colo (Revisão por Questões)",
+    "[Endocrinologia] Bateria de Questões: Doenças da Tireoide e Obesidade (Revisão por Questões)"
+  ]),
+  createWeek(25, "Abdome Obstrutivo e Incontinência", [
+    "[Preventiva] Bioestatística - Estatística Médica 4 (Teoria)",
+    "[Pediatria] Medicina Ambulatorial - Tópicos Avançados em Pediatria (Teoria)",
+    "[Cirurgia] Cirurgia Geral - Abdome Agudo Obstrutivo (Teoria)",
+    "[Ginecologia] Uroginecologia - Incontinência Urinária Feminina (Teoria)",
+    "[Obstetrícia] Fisiologia Obstétrica - Partograma e Distocias (Revisão)",
+    "[Pediatria] Medicina Ambulatorial - Tópicos Avançados (Revisão)",
+    "[Infectologia] Infecções Cardiovasculares - Endocardite Infecciosa (Teoria)",
+    "[Gastroenterologia] Doenças do Esôfago - Disfagia e Alterações Esofágicas (Teoria)",
+    "[Pneumologia] Doenças Pleurais - Derrame Pleural e Avaliação (Teoria)",
+    "[Hematologia] Série Vermelha e Branca - Microcíticas e Leucemias (Revisão)",
+    "[Reumatologia] Doenças Sistêmicas - Artrite Reumatoide e Autoimunidade (Teoria)",
+    "[Obstetrícia] Bateria de Questões: DMG, Sangramento 2ª Metade e Partograma (Revisão por Questões)"
+  ]),
+  createWeek(26, "Gestação Múltipla e Normas Reg.", [
+    "[Preventiva] Bioestatística - Estatística Médica (Revisão 2)",
+    "[Pediatria] Nutrologia Pediátrica - Desnutrição na Infância (Teoria)",
+    "[Cirurgia] Cirurgia Geral - Abdome Agudo Obstrutivo (Revisão)",
+    "[Ginecologia] Uroginecologia - Incontinência Urinária Feminina (Revisão)",
+    "[Obstetrícia] Complicações da Gestação - Gestação Múltipla (Teoria)",
+    "[Preventiva] Saúde do Trabalhador - Normas Regulamentadoras e Acidentes 1 (Teoria)",
+    "[Endocrinologia] Doenças Ósseas - Osteoporose e Doença de Paget (Teoria)",
+    "[Nefrologia] Distúrbios Eletrolíticos - Disnatremias (Revisão)",
+    "[Neurologia] Urgências Neurológicas - Coma e Alterações da Consciência (Teoria)",
+    "[Psiquiatria] Transtornos Mentais - Psicofarmacologia e Psiquiatria Infantil (Revisão)",
+    "[Hepatologia] Doenças Hepáticas - Complicações da Cirrose (Revisão)",
+    "[Pediatria] Bateria de Questões: Reanimação, Crescimento, Tópicos e Desnutrição (Revisão por Questões)"
+  ]),
+  createWeek(27, "CA Corpo Útero e Fibrilação Atrial", [
+    "[Preventiva] Saúde do Trabalhador - Normas Regulamentadoras 2 (Teoria)",
+    "[Pediatria] Nutrologia Pediátrica - Desnutrição na Infância (Revisão)",
+    "[Cirurgia] Princípios Cirúrgicos - Complicações Pós-Operatórias e Cuidados 1 (Teoria)",
+    "[Ginecologia] Oncologia Ginecológica - Câncer de Corpo de Útero e Endométrio (Teoria)",
+    "[Obstetrícia] Complicações da Gestação - Gestação Múltipla (Revisão)",
+    "[Pediatria] Nutrologia Pediátrica - Obesidade Infantil e Síndrome Metabólica (Teoria)",
+    "[Cirurgia] Princípios Cirúrgicos - Complicações Pós-Operatórias 2 (Teoria)",
+    "[Infectologia] Infecções Cardiovasculares - Endocardite Infecciosa (Revisão)",
+    "[Gastroenterologia] Doenças do Esôfago - Disfagia e Alterações Esofágicas (Revisão)",
+    "[Cardiologia] Arritmias Cardíacas - Fibrilação/Flutter Atrial e PCR (Teoria)",
+    "[Dermatologia] Oncologia - Tumores Benignos e Câncer de Pele (Teoria)"
+  ]),
+  createWeek(28, "Hemorragia Pós-Parto e CA Pulmão", [
+    "[Preventiva] Saúde do Trabalhador - Normas Regulamentadoras 3 (Teoria)",
+    "[Pediatria] Nutrologia Pediátrica - Obesidade Infantil (Revisão)",
+    "[Cirurgia] Princípios Cirúrgicos - Complicações Pós-Operatórias 3 (Teoria)",
+    "[Ginecologia] Oncologia Ginecológica - Câncer de Corpo de Útero (Revisão)",
+    "[Obstetrícia] Urgências Obstétricas - Hemorragia Pós-Parto e Atonia Uterina (Teoria)",
+    "[Endocrinologia] Doenças Ósseas - Osteoporose e Doença de Paget (Revisão)",
+    "[Neurologia] Urgências Neurológicas - AVC e Coma (Revisão)",
+    "[Pneumologia] Oncologia Pulmonar - Neoplasias Pulmonares e Nódulo Solitário (Teoria)",
+    "[Ortopedia] Patologias Ortopédicas - Quadril, Politrauma e Coluna (Revisão)",
+    "[Otorrinolaringologia] Oncologia - Nódulos e Câncer de Tireoide (Teoria)"
+  ]),
+  createWeek(29, "Amenorreia e Doenças Glomerulares", [
+    "[Preventiva] Saúde do Trabalhador - Normas Regulamentadoras (Revisão)",
+    "[Pediatria] Nefrologia Pediátrica - Infecção do Trato Urinário na Infância (Teoria)",
+    "[Cirurgia] Princípios Cirúrgicos - Complicações Pós-Operatórias (Revisão)",
+    "[Ginecologia] Ginecologia Endócrina - Amenorreia Primária e Secundária (Teoria)",
+    "[Obstetrícia] Urgências Obstétricas - Hemorragia Pós-Parto (Revisão)",
+    "[Preventiva] Sistema de Saúde - Marcos Legais do SUS e LOAS (Teoria)",
+    "[Pediatria] Nefrologia Pediátrica - Infecção do Trato Urinário (Revisão)",
+    "[Cirurgia] Vias Biliares - Doenças da Vesícula e Vias Biliares (Teoria)",
+    "[Infectologia] Farmacologia Infecciosa - Uso Clínico de Antibióticos (Teoria)",
+    "[Gastroenterologia] Urgências Gastrointestinais - Hemorragia Digestiva Alta Varicosa (Teoria)",
+    "[Nefrologia] Síndromes Renais - Doenças Glomerulares e Síndrome Nefrótica/Nefrítica (Teoria)",
+    "[Preventiva] Bateria de Questões: Financiamento, Estatística e Normas Regulamentadoras (Revisão por Questões)"
+  ]),
+  createWeek(30, "Tuberculose e Bacia Obstétrica", [
+    "[Preventiva] Sistema de Saúde - Marcos Legais do SUS (Revisão)",
+    "[Pediatria] Doenças Respiratórias - Tuberculose Pediátrica e Bronquiolite Viral (Teoria)",
+    "[Cirurgia] Vias Biliares - Doenças da Vesícula e Vias Biliares (Revisão)",
+    "[Ginecologia] Ginecologia Endócrina - Amenorreia (Revisão)",
+    "[Obstetrícia] Fisiologia Obstétrica - Bacia Materna, Pelvimetria e Estática Fetal (Teoria)",
+    "[Infectologia] Farmacologia Infecciosa - Uso Clínico de Antibióticos (Revisão)",
+    "[Endocrinologia] Distúrbios Adrenais - Hipocortisolismo e Hipercortisolismo (Cushing) (Teoria)",
+    "[Cardiologia] Arritmias Cardíacas - Fibrilação/Flutter Atrial e PCR (Revisão)",
+    "[Psiquiatria] Transtornos Mentais - Transtornos Psicóticos e de Ansiedade (Teoria)",
+    "[Reumatologia] Doenças Sistêmicas - Artropatias Infecciosas e Microcristalinas (Teoria)",
+    "[Oftalmologia] Afecções Oculares - Olho Vermelho e Doenças do Polo Posterior (Revisão)",
+    "[Cardiologia] Bateria de Questões: Valvopatias, Arritmias e PCR (Revisão por Questões)"
+  ]),
+  createWeek(31, "Infertilidade Conjugal e COVID", [
+    "[Preventiva] Medicina do Trabalho - Bases da Saúde do Trabalhador 1 (Teoria)",
+    "[Pediatria] Doenças Respiratórias - Tuberculose Pediátrica e Bronquiolite (Revisão)",
+    "[Ginecologia] Ginecologia Endócrina - Avaliação da Infertilidade Conjugal (Teoria)",
+    "[Obstetrícia] Fisiologia Obstétrica - Bacia, Pelvimetria e Estática Fetal (Revisão)",
+    "[Preventiva] Medicina do Trabalho - Bases da Saúde do Trabalhador 2 (Teoria)",
+    "[Pediatria] Alergia e Imunologia - Anafilaxia e Distúrbios da Puberdade (Teoria)",
+    "[Infectologia] Doenças Emergentes - Infecção por SARS-CoV-2 (COVID-19) 1 (Teoria)",
+    "[Gastroenterologia] Urgências Gastrointestinais - HDA Varicosa (Revisão)",
+    "[Nefrologia] Urologia/Nefrologia - Infecção do Trato Urinário (Teoria)",
+    "[Neurologia] Transtornos Neurológicos - Doenças Neuromusculares e Miopatias (Teoria)",
+    "[Pediatria] Bateria de Questões: Obesidade, ITU, Tuberculose e Bronquiolite (Revisão por Questões)",
+    "[Gastroenterologia] Bateria de Questões: Disfagia e Hemorragia Digestiva Alta (Revisão por Questões)"
+  ]),
+  createWeek(32, "Prematuridade e Cirurgia Plástica", [
+    "[Preventiva] Medicina do Trabalho - Bases da Saúde do Trabalhador 3 (Teoria)",
+    "[Pediatria] Alergia e Imunologia - Anafilaxia e Distúrbios da Puberdade (Revisão)",
+    "[Ginecologia] Ginecologia Endócrina - Infertilidade Conjugal (Revisão)",
+    "[Obstetrícia] Complicações da Gestação - Trabalho de Parto Prematuro (TPP) (Teoria)",
+    "[Infectologia] Doenças Emergentes - COVID-19 (Revisão 2) (Teoria)",
+    "[Cirurgia] Especialidades Cirúrgicas - Princípios de Cirurgia Plástica e Retalhos 1 (Teoria)",
+    "[Endocrinologia] Distúrbios Adrenais - Hipocortisolismo e Hipercortisolismo (Revisão)",
+    "[Pneumologia] Doenças Pleurais e DPOC - Manejo Clínico (Revisão)",
+    "[Hematologia] Doenças Onco-hematológicas - Gamopatias Monoclonais e Mieloma Múltiplo (Revisão)",
+    "[Hepatologia] Doenças Hepáticas - Síndrome Hepatorrenal e Tumores Hepáticos (Teoria)",
+    "[Endocrinologia] Bateria de Questões: Osteoporose e Distúrbios Adrenais (Revisão por Questões)"
+  ]),
+  createWeek(33, "Violência Sexual e IAM", [
+    "[Preventiva] Medicina do Trabalho - Bases da Saúde do Trabalhador (Revisão)",
+    "[Pediatria] Doenças Sistêmicas - Doença de Kawasaki e Distúrbios Metabólicos (Teoria)",
+    "[Cirurgia] Especialidades Cirúrgicas - Cirurgia Plástica 2 (Teoria)",
+    "[Ginecologia] Ética e Legislação - Atendimento à Vítima de Violência Sexual (Teoria)",
+    "[Obstetrícia] Complicações da Gestação - Prematuridade e TPP (Revisão)",
+    "[Preventiva] Políticas Públicas - Políticas Nacionais de Saúde 1 (Teoria)",
+    "[Pediatria] Doenças Sistêmicas - Kawasaki e Distúrbios Metabólicos (Revisão)",
+    "[Nefrologia] Síndromes Renais - Glomerulopatias e Infecção do Trato Urinário (Revisão)",
+    "[Neurologia] Transtornos Neurológicos - Doenças Neuromusculares e Miopatias (Revisão)",
+    "[Cardiologia] Doença Coronariana - Dislipidemia e IAM com Supradesnível de ST (Teoria)",
+    "[Obstetrícia] Bateria de Questões: Gestação Múltipla, Hemorragia Pós-Parto e TPP (Revisão por Questões)",
+    "[Nefrologia] Bateria de Questões: Disnatremias, Glomerulopatias e ITU (Revisão por Questões)"
+  ]),
+  createWeek(34, "Síndromes Genéticas e Queimaduras", [
+    "[Preventiva] Políticas Públicas - Políticas Nacionais de Saúde 2 (Teoria)",
+    "[Pediatria] Genética Médica - Síndromes Genéticas e Erros Inatos do Metabolismo (Teoria)",
+    "[Cirurgia] Especialidades Cirúrgicas - Cirurgia Plástica (Revisão)",
+    "[Ginecologia] Ética e Legislação - Atendimento à Vítima de Violência Sexual (Revisão)",
+    "[Infectologia] Doenças Emergentes - COVID-19 (Revisão Final)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Manejo de Queimaduras e Trauma Elétrico (Teoria)",
+    "[Psiquiatria] Transtornos Mentais - Transtornos Psicóticos e Ansiedade (Revisão)",
+    "[Reumatologia] Doenças Sistêmicas - Vasculites, Artrite Reumatoide e Infecções (Revisão)",
+    "[Dermatologia] Oncologia - Tumores Benignos e Câncer de Pele (Revisão)",
+    "[Ginecologia] Bateria de Questões: Incontinência, CA de Endométrio, Amenorreia e Violência Sexual (Revisão por Questões)",
+    "[Infectologia] Bateria de Questões: Acidentes Peçonhentos, Endocardite, Antibióticos e COVID (Revisão por Questões)"
+  ]),
+  createWeek(35, "Finalização de Temas", [
+    "[Preventiva] Políticas Públicas - Políticas Nacionais de Saúde (Revisão)",
+    "[Pediatria] Genética Médica - Síndromes Genéticas e Erros Inatos (Revisão)",
+    "[Cirurgia] Atendimento ao Politraumatizado - Queimaduras e Trauma Elétrico (Revisão)",
+    "[Cardiologia] Doença Coronariana - Dislipidemia e IAMCSST (Revisão)",
+    "[Hepatologia] Doenças Hepáticas - Síndrome Hepatorrenal e Tumores (Revisão)",
+    "[Otorrinolaringologia] Especialidades - Neoplasias, IVAS e Tireoide (Revisão)",
+    "[Preventiva] Bateria de Questões: Marcos Legais do SUS, Saúde Trabalhador e Políticas (Revisão por Questões)",
+    "[Pediatria] Bateria de Questões: Anafilaxia, Puberdade, Kawasaki e Síndromes Genéticas (Revisão por Questões)",
+    "[Cirurgia] Bateria de Questões: Abdome Obstrutivo, Complicações Pós-Op, Vias Biliares e Queimaduras (Revisão por Questões)",
+    "[Cardiologia] Bateria de Questões: Valvopatias, Arritmias, Dislipidemias e IAM (Revisão por Questões)"
+  ]),
+  createWeek(36, "Revisão Geral de Especialidades", [
+    "[Neurologia] Revisão Geral - Bateria de Questões de Neurologia (Questões)",
+    "[Pneumologia] Revisão Geral - Bateria de Questões de Pneumologia (Questões)",
+    "[Hematologia] Revisão Geral - Bateria de Questões de Hematologia (Questões)",
+    "[Psiquiatria] Revisão Geral - Bateria de Questões de Psiquiatria (Questões)",
+    "[Hepatologia] Revisão Geral - Bateria de Questões de Hepatologia (Questões)",
+    "[Reumatologia] Revisão Geral - Bateria de Questões de Reumatologia (Questões)",
+    "[Dermatologia] Revisão Geral - Bateria de Questões de Dermatologia (Questões)",
+    "[Ortopedia] Revisão Geral - Bateria de Questões de Ortopedia (Questões)",
+    "[Otorrinolaringologia] Revisão Geral - Bateria de Questões de Otorrinolaringologia (Questões)",
+    "[Oftalmologia] Revisão Geral - Bateria de Questões de Oftalmologia (Questões)"
+  ]),
+  createWeek(37, "Revisão Teórica Direcionada I", [
+    "[Pediatria] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Preventiva] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Cirurgia] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Ginecologia] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Obstetrícia] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Infectologia] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Gastroenterologia] Revisão Teórica Direcionada - Principais Assuntos"
+  ]),
+  createWeek(38, "Revisão Teórica Direcionada II", [
+    "[Endocrinologia] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Cardiologia e Nefrologia] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Neurologia e Pneumologia] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Hematologia e Psiquiatria] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Hepatologia e Reumatologia] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Dermatologia e Ortopedia] Revisão Teórica Direcionada - Principais Assuntos",
+    "[Otorrinolaringologia e Oftalmologia] Revisão Teórica Direcionada - Principais Assuntos"
+  ]),
+  createWeek(39, "Baterias Finais de Questões", [
+    "[Geral] Simulado de Revisão Geral 1 - Padrão R1 (Questões)",
+    "[Geral] Simulado de Revisão Geral 2 - Padrão R1 (Questões)",
+    "[Geral] Simulado de Revisão Geral 3 - Padrão R1 (Questões)",
+    "[Geral] Simulado de Revisão Geral 4 - Padrão R1 (Questões)",
+    "[Geral] Simulado de Revisão Geral 5 - Padrão R1 (Questões)",
+    "[Geral] Simulado de Revisão Geral 6 - Padrão R1 (Questões)",
+    "[Geral] Simulado de Revisão Geral 7 - Padrão R1 (Questões)"
+  ]),
+  createWeek(40, "Correção de Erros (Última Semana)", [
+    "[Pediatria e Cirurgia] Refação e Correção de Questões Erradas",
+    "[Preventiva e Infectologia] Refação e Correção de Questões Erradas",
+    "[Ginecologia e Obstetrícia] Refação e Correção de Questões Erradas",
+    "[Endocrinologia e Gastroenterologia] Refação e Correção de Questões Erradas",
+    "[Cardiologia, Psiquiatria e Nefrologia] Refação e Correção de Questões Erradas",
+    "[Neurologia, Hematologia, Pneumologia e Hepatologia] Refação e Correção de Questões Erradas",
+    "[Reumatologia, Ortopedia, Otorrino, Dermato e Oftalmo] Refação e Correção de Questões Erradas"
+  ])
+];
+
+const TaskIcon = ({ type }) => {
+  switch (type) {
+    case 'teoria': return <BookOpen className="text-blue-500 w-5 h-5 mr-3" />;
+    case 'revisao': return <RefreshCcw className="text-purple-500 w-5 h-5 mr-3" />;
+    case 'questoes': return <HelpCircle className="text-green-500 w-5 h-5 mr-3" />;
+    default: return <BookOpen className="text-gray-500 w-5 h-5 mr-3" />;
+  }
+};
+
+export default function App() {
+  const [completedTasks, setCompletedTasks] = useState(() => {
+    // Mantém fallback para localStorage apenas para desenvolvimento offline
+    const saved = localStorage.getItem('cronograma_med_progress_full');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [user, setUser] = useState(null);
+  const [syncStatus, setSyncStatus] = useState('Conectando...'); 
+
+  // Inicializa Autenticação
+  useEffect(() => {
+    if (!isFirebaseAvailable) {
+       setSyncStatus('Local (Offline)');
+       return;
+    }
+
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
         }
-    </script>
-  
-</head>
-<body>
-  <header>
-    <h1 class="container">qred</h1>
-    <nav>
-      <ul>
-        <li><a href="index.html">Início</a></li>
-        <li><a href="login.html">Entrar</a></li>
-        <li><a href="signup.html">Cadastrar</a></li>
-        <li><a href="upload.html">Enviar PDF</a></li>
-        <li><a href="questions.html">Questões</a></li>
-        <li><a href="simulados.html">Simulados</a></li>
-        <li><a href="stats.html">Estatísticas</a></li>
-      </ul>
-    </nav>
-  </header>
-  <main class="container">
-    <h2>Enviar PDF</h2>
-    <p>Faça upload de um arquivo PDF com questões para treinar. Nosso sistema analisará as questões e gabaritos automaticamente.</p>
-    <form>
-      <input type="file" accept=".pdf" required>
-      <button type="submit">Enviar</button>
-    </form>
-  </main>
-  <footer>
-    <p>&copy; 2025 Qred. Todos os direitos reservados.</p>
-  </footer>
-</body>
-</html>
+      } catch (error) {
+        console.error("Erro na autenticação:", error);
+        setSyncStatus('Erro de Login');
+      }
+    };
+    initAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  // Busca Dados da Nuvem
+  useEffect(() => {
+    if (!isFirebaseAvailable || !user) return;
+
+    setSyncStatus('Sincronizando...');
+    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'progress', 'tasks');
+
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setCompletedTasks(docSnap.data().completedTasks || {});
+      }
+      setSyncStatus('Sincronizado');
+    }, (error) => {
+      console.error("Erro no Firestore:", error);
+      setSyncStatus('Erro ao Buscar Dados');
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const toggleTask = async (taskId) => {
+    const newTasks = {
+      ...completedTasks,
+      [taskId]: !completedTasks[taskId]
+    };
+    setCompletedTasks(newTasks); // Atualização Otimista na UI
+
+    if (isFirebaseAvailable && user) {
+      setSyncStatus('Salvando...');
+      const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'progress', 'tasks');
+      try {
+        await setDoc(docRef, { completedTasks: newTasks }, { merge: true });
+        setSyncStatus('Sincronizado');
+      } catch (e) {
+        console.error("Erro ao salvar:", e);
+        setSyncStatus('Erro ao Salvar');
+      }
+    } else {
+      localStorage.setItem('cronograma_med_progress_full', JSON.stringify(newTasks));
+    }
+  };
+
+  const calculateProgress = () => {
+    const totalTasks = scheduleData.reduce((acc, week) => acc + week.tasks.length, 0);
+    const completedCount = Object.values(completedTasks).filter(Boolean).length;
+    return totalTasks === 0 ? 0 : Math.round((completedCount / totalTasks) * 100);
+  };
+
+  const progress = calculateProgress();
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans">
+      
+      {/* Cabeçalho Fixo com a Barra de Progresso */}
+      <header className="bg-blue-900 text-white sticky top-0 z-20 shadow-lg">
+        <div className="max-w-4xl mx-auto px-4 py-4 md:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="text-center md:text-left">
+            <h1 className="text-2xl font-extrabold tracking-tight">Estratégia MED</h1>
+            <p className="text-blue-200 text-sm mt-1">Cronograma Intensivo Completo</p>
+          </div>
+
+          <div className="w-full md:w-1/3 bg-blue-800 rounded-lg p-4 shadow-inner">
+             <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-blue-100 flex items-center">
+                  Progresso Global
+                  {syncStatus === 'Sincronizado' ? (
+                    <Cloud className="w-4 h-4 ml-2 text-green-400" title="Salvo na nuvem" />
+                  ) : syncStatus.includes('Local') ? (
+                    <CloudOff className="w-4 h-4 ml-2 text-gray-400" title="Salvo localmente" />
+                  ) : (
+                    <RefreshCcw className="w-4 h-4 ml-2 text-yellow-400 animate-spin" title={syncStatus} />
+                  )}
+                </span>
+                <span className="text-sm font-bold bg-blue-900 px-2 py-0.5 rounded text-green-300">{progress}%</span>
+             </div>
+             <div className="w-full bg-blue-950 rounded-full h-3 overflow-hidden">
+               <div className="bg-green-400 h-3 rounded-full transition-all duration-700 ease-out" style={{ width: `${progress}%` }}></div>
+             </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Lista Contínua de Semanas */}
+      <main className="max-w-4xl mx-auto px-4 py-8 md:px-8 space-y-12 pb-24">
+        
+        {/* Card de Orientação Geral */}
+        <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 text-blue-800 text-sm shadow-sm">
+           <h4 className="font-bold mb-2 flex items-center text-base"><HelpCircle className="w-5 h-5 mr-2"/> Bem-vindo ao Cronograma Intensivo</h4>
+           <p>Esta página contém todas as 40 semanas de estudo. Role para baixo para visualizar o plano completo. Suas marcações de conclusão são salvas automaticamente <strong>na nuvem</strong> e vinculadas ao seu usuário.</p>
+        </div>
+
+        {scheduleData.map((week) => {
+          const completedInWeek = week.tasks.filter(t => completedTasks[t.id]).length;
+          
+          return (
+            <section key={week.week} className="scroll-mt-32">
+              <header className="mb-4 pl-1">
+                <h2 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-1">Semana {week.week}</h2>
+                <h3 className="text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight">{week.title}</h3>
+              </header>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-4 md:px-6 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                  <span className="font-semibold text-gray-700">
+                    Tarefas Concluídas: <span className={completedInWeek === week.tasks.length ? "text-green-600" : "text-blue-600"}>{completedInWeek}</span> de {week.tasks.length}
+                  </span>
+                  <div className="hidden sm:flex items-center text-xs text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200">
+                     {syncStatus === 'Sincronizado' ? <Cloud className="w-3.5 h-3.5 mr-1.5 text-green-500"/> : <Save className="w-3.5 h-3.5 mr-1.5 text-blue-500"/>}
+                     {syncStatus}
+                  </div>
+                </div>
+                
+                <ul className="divide-y divide-gray-100">
+                  {week.tasks.map((task) => {
+                    const isCompleted = completedTasks[task.id] || false;
+                    
+                    return (
+                      <li 
+                        key={task.id} 
+                        className={`p-4 md:px-6 flex items-start transition-all duration-200 hover:bg-gray-50 cursor-pointer ${isCompleted ? 'bg-blue-50/40' : ''}`}
+                        onClick={() => toggleTask(task.id)}
+                      >
+                        <button 
+                          className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                            isCompleted ? 'bg-green-500 border-green-500 scale-110' : 'border-gray-300 hover:border-blue-400'
+                          }`}
+                        >
+                          {isCompleted && <CheckCircle className="w-4 h-4 text-white" />}
+                        </button>
+                        
+                        <div className="ml-4 flex-1">
+                          <div className="flex items-center mb-1">
+                            <TaskIcon type={task.type} />
+                            <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                              {task.type === 'revisao' ? 'Revisão' : task.type === 'questoes' ? 'Questões' : 'Teoria'}
+                            </span>
+                          </div>
+                          <p className={`text-gray-800 font-medium ${isCompleted ? 'line-through text-gray-400' : ''}`}>
+                            {task.title}
+                          </p>
+                          {task.type === 'questoes' && (
+                            <div className="mt-3 mb-1">
+                              <a 
+                                href={task.link || "#"} 
+                                onClick={(e) => { e.stopPropagation(); /* Impede que clicar no link marque a tarefa como concluída */ }}
+                                className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-100 border border-blue-200 rounded-md hover:bg-blue-200 transition-colors shadow-sm"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                                Acessar Lista de Questões
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </section>
+          );
+        })}
+        
+      </main>
+    </div>
+  );
+}
